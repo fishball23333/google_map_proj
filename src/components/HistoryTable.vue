@@ -60,12 +60,7 @@ export default {
     }, 
     mounted(){
         this.pageUpdate()
-        console.log(this.currentPageContent)
     }
-
 }
 </script>
 
-<style>
-
-</style>

@@ -5,25 +5,24 @@
     <div class="d-flex">
     <form @submit.prevent="searchLocation" class="d-flex" >
         <input class="form-control me-1" type="text" v-model="address" placeholder="search the location">
-        
         <button type="submit"  class="btn btn-outline-success my-2 my-sm-0 me-2">Search</button>
     </form>
     <button @click="setCurrentLocation" class="btn btn-outline-success me-2">Acquire User's Current Location</button>
-    </div>
+    </div> 
     </nav>
 
-    <h3 v-if="latestedTimeZone">Time zone for the latest searched location is "{{latestedTimeZone}}"</h3>
-    <h3 v-if="latestedLocalTime">Local time for the lasest searched location is "{{latestedLocalTime.year}}/{{latestedLocalTime.month}}/{{latestedLocalTime.day}}  {{latestedLocalTime.hours}}hr(s)/{{latestedLocalTime.minutes}}min(s)/{{latestedLocalTime.seconds}}s"</h3>
+    <h4 v-if="latestedTimeZone" class="time">Time zone for the latest searched location is: "{{latestedTimeZone}}"</h4>
+    <h4 v-if="latestedLocalTime" class="time">Local time for the lasest searched location is:  "{{latestedLocalTime.year}}/{{latestedLocalTime.month}}/{{latestedLocalTime.day}} {{latestedLocalTime.hours}}hr(s)/{{latestedLocalTime.minutes}}min(s)/{{latestedLocalTime.seconds}}s"</h4>
+
     <hr>
 
     <HistoryTable :searchedHistory="searchedHistory" :key="searchedHistory.length"/>
     <button @click="deleteSelectedLocations" class="btn btn-outline-success my-2 my-sm-0">Delete Selected Searched Address(es) </button>
     <hr>
+    <div class="d-flex justify-content-center">
     <div id="map"></div>
+    </div>
   </div>
-
-
-
 </template>
 
 <script>
@@ -34,30 +33,18 @@ export default {
     data(){
         return {
             apiKey: process.env.VUE_APP_GOOGLE_MAP_API, 
-            AdvancedMarkerElement: null,
+            Marker: null,
             map:null,
             loader:null,
             geocoder: null,
             mapOptions:null,
-            marker:null, 
-            currentPos: null,
             address: null, 
             searchedHistory: [],
             latestedTimeZone: null, 
             latestedLocalTime: null,
-            tempSelectedIDList: []
         }
     },
     mounted(){
-        this.initMap()
-            //   this.marker = new google.maps.Marker({
-
-            //             position: {lat:43.6532, lng: -79.3832},
-            //             map: this.map
-            //             })
-    },
-    methods: {
-        initMap: function(){
             this.loader = new Loader({
             apiKey: this.apiKey,
             version: "weekly",
@@ -66,53 +53,41 @@ export default {
 
             this.mapOptions = {
             mapId: "DEMO_MAP_ID",
-            center: {
-                lat: 43.6532,
-                lng: -79.3832
-            },
+            center: {lat: 43.6532, lng: -79.3832},
             zoom: 4
             };
             
-            this.loader.importLibrary("maps").then(({Map})=>{
-                this.map = new Map(document.getElementById("map"), this.mapOptions);
-                this.geocoder = new google.maps.Geocoder()
-            })
-            this.loader.importLibrary("marker")
-            this.loader.importLibrary("marker").then(({AdvancedMarkerElement})=>{
-                this.AdvancedMarkerElement = AdvancedMarkerElement
-                const marker = new AdvancedMarkerElement({
-                    map:this.map
-                })
+            this.loader.load().then(
+                async() =>{
+                    this.map = new google.maps.Map(document.getElementById("map"), this.mapOptions);
+                    this.geocoder = new google.maps.Geocoder()
+                    const {Marker} = await google.maps.importLibrary("marker")
+                    this.Marker = Marker;
                 }
-                 
             )
-        },
+    },
+    methods: {
         setCurrentLocation: function(){
-            console.log("set")
-            if(navigator.geolocation){
+            if (navigator.geolocation){
                 navigator.geolocation.getCurrentPosition(
                     (position)=>{
-                        this.currentPos = {
+                        const currentPos = {
                             lat: position.coords.latitude, 
                             lng: position.coords.longitude
                         }
-                        console.log(this.currentPos)
-                        this.address = `${this.currentPos.lat}, ${this.currentPos.lng}`
+                        this.address = `${currentPos.lat}, ${currentPos.lng}`
                         this.searchLocation()
                     }, ()=>{
-                        console.log("error fetching the location data")
+                        alert("error fetching the location data")
                     }
                 )
             } else {
-                console.log("error fetching location")
+                alert("error fetching location")
             }
         },
         searchLocation: function(){
-            console.log(`searched address is ${this.address}`)
             this.geocoder.geocode({'address': this.address}, (results, status)=>{
                 if (status == 'OK'){
-                    console.log(`searched result si ${results}`)
-                    console.log(results[0].geometry.location.lat(), results[0].geometry.location.lng())
                     this.fetchTime(results[0].geometry.location.lat(), results[0].geometry.location.lng())
                     this.setMarker(results)
                 } else {
@@ -120,30 +95,18 @@ export default {
                 }
             })
         }, 
-        setMarker:function(results){
-                // 
+        setMarker: function(results){
                 let historyItem = results[0]
-                console.log(`result is ${results[0]}`)
-                historyItem.selection=false //for the use of cancellation selection
+                historyItem.marker = new this.Marker({
+                    title: historyItem.place_id, 
+                    position: results[0].geometry.location,
+                    map: this.map
+                })
+                historyItem.selection=false //for the use of cancellation 
                 this.searchedHistory.push(historyItem)
-
-
-            //  this.map.setCenter(results[0].geometry.location);
-             if (this.marker){
-                console.log("clear up function ")
-                this.marker.setMap(null)
-                this.marker = null
-                console.log("cleared marker:", this.marker)
-             }
-         
-              this.marker = new google.maps.Marker({
-
-                        position: results[0].geometry.location,
-                        map: this.map
-                        })
-            console.log("marker: ", this.marker)  
+                this.map.setCenter(results[0].geometry.location)
         },
-        fetchTime(lat, lng){
+        fetchTime: function(lat, lng){
             const time = Math.round(Date.now()/1000)
             const url = `https://maps.googleapis.com/maps/api/timezone/json?location=${lat}%2C${lng}&timestamp=${time}&key=${this.apiKey}`
             fetch(url)
@@ -158,26 +121,33 @@ export default {
                         this.latestedLocalTime.hours = calculatedTime.getHours()
                         this.latestedLocalTime.minutes = calculatedTime.getMinutes()
                         this.latestedLocalTime.seconds = calculatedTime.getSeconds()
-
                     }
-                    console.log("data is ", data)
                 })
-                .catch(error=>{console.log("error" + error)})
+                .catch(error=>{alert("error" + error)})
         },
-        deleteSelectedLocations:function(){
-            this.searchedHistory.length > 0 
-                ? this.searchedHistory = this.searchedHistory.filter((item)=>item.selection === false) 
-                : alert("searched history list is empty, there is nothing to delete")
+        deleteSelectedLocations: function(){
+            if (this.searchedHistory.length > 0){
+                this.searchedHistory = this.searchedHistory.filter((item)=>{
+                    if (item.selection === false){
+                        return true
+                    } else {
+                        item.marker.setVisible(false)
+                        return false
+                    }   
+                })
+            }
         }
     }}
-
-
 </script>
 
 <style>
     #map{
-    width:100%;
+    width:90%;
     height:500px;
     background-color: grey;
+    }
+    .time{
+        text-align: left;
+        margin-left: 5px;
     }
 </style>
