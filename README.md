@@ -1,8 +1,7 @@
 # google_map_proj
 
 
-# This is the simple vue project for the interview of Accuenergy Canada Inc., for the simplicity, the ".env" file containing google map api has been included in this git folder. If you have any questions, please let me know as soon as possible, thank you. 
-
+# This is the simple vue project 
 ## Project setup
 ```
 npm install
